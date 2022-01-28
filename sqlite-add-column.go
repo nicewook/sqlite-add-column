@@ -2,21 +2,68 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// type Person struct {
-// 	Name string `json:"name"`
-// 	Age  int    `json:"age"`
-// }
+type Person struct {
+	Name   string `json:"name"`
+	Age    int    `json:"age"`
+	Height int    `json:"height"`
+}
 
-// type PersonWithHeight struct {
-// 	Name   string `json:"name"`
-// 	Age    int    `json:"age"`
-// 	Height int    `json:"height"`
-// }
+const (
+	myTable      = "myTable"
+	columnHeight = "height"
+)
+
+// existColumn checks if a column is exist in the table
+// I did the loop twice to have all the column names to be printed
+func existColumn(db *sql.DB, table, columnName string) bool {
+
+	// reference: https://stackoverflow.com/a/50951476
+	rows, err := db.Query(fmt.Sprintf(`select name from pragma_table_info("%s")`, table))
+	if err != nil {
+		log.Println(err)
+		return false
+	}
+	defer rows.Close()
+
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			log.Println(err)
+			return false
+		}
+		names = append(names, name)
+	}
+	fmt.Printf("all the columns in the table: %v\n", names)
+	for _, name := range names {
+		if name == columnName {
+			fmt.Printf("there is colume %s in table\n", columnName)
+			return true
+		}
+	}
+	fmt.Printf("there is no colume named %s in table\n", columnName)
+	return false
+}
+
+func insertRow(db *sql.DB, p Person) error {
+
+	insertPersonSQL := `INSERT INTO myTable (  
+		Name,
+		Age,
+		Height          
+	) VALUES (?, ?, ?)`
+
+	if _, err := db.Exec(insertPersonSQL, p.Name, p.Age, p.Height); err != nil {
+		return err
+	}
+	return nil
+}
 
 func main() {
 
@@ -27,115 +74,41 @@ func main() {
 	}
 	defer db.Close()
 
-	// create myTable
+	// create myTable and exist check
 	createTableOneSQL := `CREATE TABLE IF NOT EXISTS myTable (
 		"ID"     INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-		"Name"   TEXT
+		"Name"   TEXT,
+		"Age"    INTEGER
 	);`
 
-	_, err = db.Exec(createTableOneSQL)
-	log.Println(err)
-
-	// check if height column is exist
-	rows, err := db.Query(`select name from pragma_table_info("myTable")`)
-	if err != nil {
+	if _, err = db.Exec(createTableOneSQL); err != nil {
 		log.Fatal(err)
-		// fmt.Println(err)
 	}
-	defer rows.Close()
+	existColumn(db, myTable, columnHeight)
 
-	// log.Println(rows.Columns())
-	// log.Println(rows.ColumnTypes())
-	var names []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			log.Fatal(err)
-		}
-		log.Println("name: ", name)
-		names = append(names, name)
+	// add column and exist check
+	// reference: https://stackoverflow.com/questions/4253804/insert-new-column-into-table-in-sqlite
+	if _, err = db.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s", myTable, columnHeight)); err != nil {
+		log.Println(err)
 	}
-	log.Println("names: ", names)
-}
+	existColumn(db, myTable, columnHeight)
 
-// 	for rows.Next() {
-// 		var alb Album
-// 		if err := rows. .Scan(&alb.ID, &alb.Title, &alb.Artist,
-// 				&alb.Price, &alb.Quantity); err != nil {
-// 				return albums, err
-// 		}
-// 		albums = append(albums, album)
-// }
+	// insert row and exist check
+	personOne := Person{"Kim", 32, 176}
+	if err := insertRow(db, personOne); err != nil {
+		log.Fatal(err)
+	}
+	existColumn(db, myTable, "height")
 
-// 	var myDepartment string
-// 	if err := row.Scan(&myDepartment); err != nil {
-// 		log.Println(err)
-// 	}
-// 	log.Println(myDepartment)
+	// trying to add existing column again
 
-// 	row3 := db.QueryRow("select name from myTable")
-// 	if row3 == nil {
-// 		log.Fatalln("failed")
-// 		return
-// 	}
-
-// 	var myName string
-// 	if err := row3.Scan(&myName); err != nil {
-// 		log.Println(err)
-// 	}
-// 	log.Println(myName)
-
-// 	// inset 1 data to db
-// 	person1 := Person1{
-// 		"JHS",
-// 		47,
-// 	}
-// 	if _, err := insertRow(db, person1); err != nil { // Create Database Tables
-// 		log.Fatal("fail to add person1 to table:", err)
-// 	}
-
-// 	// read db
-// 	person1s, err := getAll(db)
-// 	if err != nil { // Create Database Tables
-// 		log.Fatal("fail to add person1 to table:", err)
-// 	}
-// 	log.Printf("person1s: %+v\n", person1s)
-
-// 	row2 := db.QueryRow("select department from myTable")
-// 	if row2 == nil {
-// 		log.Fatalln("failed")
-// 		return
-// 	}
-
-// 	if err := row2.Scan(&myDepartment); err != nil {
-// 		log.Println(err)
-// 	}
-// 	log.Println(myDepartment)
-// check table info
-// tableInfo, err := db.Exec("PRAGMA table_info(myTable)")
-// if err != nil {
-// 	log.Fatal(err)
-// }
-// log.Printf("%+v\n", tableInfo)
-
-/*
-	row := db.QueryRow("PRAGMA user_version")
-	if row == nil {
-		log.Fatalln("PRAGMA user_version not found")
+	if exist := existColumn(db, myTable, columnHeight); exist {
+		fmt.Printf("colume %s is already exist.\n", columnHeight)
 		return
+	} else {
+		if _, err = db.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s", myTable, columnHeight)); err != nil {
+			log.Println(err)
+		}
 	}
-	var version int
-	if err = row.Scan(&version); err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("PRAGMA user_version is %d\n", version)
-*/
-// row := db.QueryRow("select name from myTable")
 
-// alter db
-
-// add db
-
-// read db
-
-// }
+}
