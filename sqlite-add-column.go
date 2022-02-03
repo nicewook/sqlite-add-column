@@ -40,29 +40,34 @@ func existColumn(db *sql.DB, table, columnName string) bool {
 		}
 		names = append(names, name)
 	}
-	fmt.Printf("all the columns in the table: %v\n", names)
+	fmt.Printf("--all the columns in the table: %v\n", names)
 	for _, name := range names {
 		if name == columnName {
-			fmt.Printf("there is colume %s in table\n", columnName)
+			fmt.Printf("--there is column [%s] in table\n", columnName)
 			return true
 		}
 	}
-	fmt.Printf("there is no colume named %s in table\n", columnName)
+	fmt.Printf("--there is no column [%s] in table\n", columnName)
 	return false
 }
 
-func insertRow(db *sql.DB, p Person) error {
+// addColumn trys to add a column to the table
+// reference: https://stackoverflow.com/questions/4253804/insert-new-column-into-table-in-sqlite
+func addColumn(db *sql.DB, table, columnName string) error {
+	_, err := db.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s", table, columnName))
+	return err
+}
 
-	insertPersonSQL := `INSERT INTO myTable (  
+func insertPerson(db *sql.DB, table string, p Person) error {
+
+	insertPersonSQL := fmt.Sprintf(`INSERT INTO %s (  
 		Name,
 		Age,
 		Height          
-	) VALUES (?, ?, ?)`
+	) VALUES (?, ?, ?)`, table)
 
-	if _, err := db.Exec(insertPersonSQL, p.Name, p.Age, p.Height); err != nil {
-		return err
-	}
-	return nil
+	_, err := db.Exec(insertPersonSQL, p.Name, p.Age, p.Height)
+	return err
 }
 
 func main() {
@@ -85,30 +90,24 @@ func main() {
 		log.Fatal(err)
 	}
 	existColumn(db, myTable, columnHeight)
-
-	// add column and exist check
-	// reference: https://stackoverflow.com/questions/4253804/insert-new-column-into-table-in-sqlite
-	if _, err = db.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s", myTable, columnHeight)); err != nil {
-		log.Println(err)
+	for i := 0; i < 3; i++ {
+		if err := addColumn(db, myTable, columnHeight); err != nil {
+			log.Println(err)
+		} else {
+			log.Printf("column [%s] added to table [%s]", columnHeight, myTable)
+		}
 	}
+
 	existColumn(db, myTable, columnHeight)
 
 	// insert row and exist check
 	personOne := Person{"Kim", 32, 176}
-	if err := insertRow(db, personOne); err != nil {
+	if err := insertPerson(db, myTable, personOne); err != nil {
 		log.Fatal(err)
 	}
 	existColumn(db, myTable, "height")
 
-	// trying to add existing column again
-
-	if exist := existColumn(db, myTable, columnHeight); exist {
-		fmt.Printf("colume %s is already exist.\n", columnHeight)
-		return
-	} else {
-		if _, err = db.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s", myTable, columnHeight)); err != nil {
-			log.Println(err)
-		}
+	if err := addColumn(db, myTable, columnHeight); err != nil {
+		log.Println(err)
 	}
-
 }
