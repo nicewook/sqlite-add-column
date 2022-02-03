@@ -111,3 +111,14 @@ func main() {
 		log.Println(err)
 	}
 }
+
+// --all the columns in the table: [ID Name Age]
+// --there is no column [height] in table
+// 2022/02/03 10:54:59 sqlite-add-column.go:97: column [height] added to table [myTable]
+// 2022/02/03 10:54:59 sqlite-add-column.go:95: duplicate column name: height
+// 2022/02/03 10:54:59 sqlite-add-column.go:95: duplicate column name: height
+// --all the columns in the table: [ID Name Age height]
+// --there is column [height] in table
+// --all the columns in the table: [ID Name Age height]
+// --there is column [height] in table
+// 2022/02/03 10:54:59 sqlite-add-column.go:111: duplicate column name: height
